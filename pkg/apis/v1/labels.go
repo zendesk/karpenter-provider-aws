@@ -180,6 +180,7 @@ var (
 	AnnotationInstanceTagged                 = apis.Group + "/tagged"
 	AnnotationInstanceProfile                = apis.Group + "/instance-profile-name"
 	AnnotationNVIDIAConsumableCapacity       = apis.Group + "/nvidia-consumable-capacity"
+	AnnotationGPUCapacityMultiplier          = apis.Group + "/gpu-capacity-multiplier"
 
 	NodeClaimTagKey          = coreapis.Group + "/nodeclaim"
 	NameTagKey               = "Name"
