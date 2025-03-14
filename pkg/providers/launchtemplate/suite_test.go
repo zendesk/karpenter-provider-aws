@@ -1083,6 +1083,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				nil,
 				nil,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 
@@ -1138,6 +1139,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				kc.EvictionHard,
 				kc.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 
@@ -1167,6 +1169,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				kc.EvictionHard,
 				kc.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 			overhead := it.Overhead.Total()
