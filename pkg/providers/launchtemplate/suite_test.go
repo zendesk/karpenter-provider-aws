@@ -1047,6 +1047,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 
@@ -1100,6 +1101,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 
@@ -1127,6 +1129,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 			overhead := it.Overhead.Total()

@@ -908,6 +908,7 @@ func (c *Client) toNode(ctx context.Context, instance ec2types.Instance) *corev1
 		nil,
 		// TODO: Eventually support different AMIFamilies from userData
 		"al2023",
+		1,
 		nil,
 	)
 	nodeName := fmt.Sprintf("%s-%d", strings.ReplaceAll(namesgenerator.GetRandomName(0), "_", "-"), rand.Uint32()) //nolint:gosec
