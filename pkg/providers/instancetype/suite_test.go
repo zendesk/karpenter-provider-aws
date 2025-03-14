@@ -751,6 +751,26 @@ var _ = Describe("InstanceTypeProvider", func() {
 		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pod)
 		ExpectNotScheduled(ctx, env.Client, pod)
 	})
+	It("should launch instances for nvidia.com/gpu resource requests with multiplier", func() {
+		nodeNames := sets.NewString()
+		nodeClass.Annotations = map[string]string{v1.AnnotationGPUCapacityMultiplier: "2"} // Set multiplier to 2 to test packing
+		ExpectApplied(ctx, env.Client, nodePool, nodeClass)
+		pods := []*corev1.Pod{
+			coretest.UnschedulablePod(coretest.PodOptions{
+				ResourceRequirements: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{v1.ResourceNVIDIAGPU: resource.MustParse("8")},
+					Limits:   corev1.ResourceList{v1.ResourceNVIDIAGPU: resource.MustParse("8")},
+				},
+			}),
+		}
+		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pods...)
+		for _, pod := range pods {
+			node := ExpectScheduled(ctx, env.Client, pod)
+			Expect(node.Labels).To(HaveKeyWithValue(corev1.LabelInstanceTypeStable, "p3.8xlarge"))
+			nodeNames.Insert(node.Name)
+		}
+		Expect(nodeNames.Len()).To(Equal(1))
+	})
 	It("should launch instances for nvidia.com/gpu resource requests", func() {
 		nodeNames := sets.NewString()
 		ExpectApplied(ctx, env.Client, nodePool, nodeClass)
@@ -1009,6 +1029,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 			Expect(it.Capacity.Pods().Value()).ToNot(BeNumerically("==", 110))
@@ -1034,6 +1055,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				windowsNodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 			Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 110))
@@ -1087,6 +1109,34 @@ var _ = Describe("InstanceTypeProvider", func() {
 		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pod)
 		ExpectScheduled(ctx, env.Client, pod)
 	})
+	It("should multiply gpu capacity by gpu capacity multiplier", func() {
+		instanceInfo, err := awsEnv.EC2API.DescribeInstanceTypes(ctx, &ec2.DescribeInstanceTypesInput{})
+		Expect(err).To(BeNil())
+		nodeClass.Spec.Kubelet = &v1.KubeletConfiguration{}
+		for _, info := range instanceInfo.InstanceTypes {
+			if info.InstanceType == "g4dn.8xlarge" {
+				it := instancetype.NewInstanceType(ctx,
+					info,
+					fake.DefaultRegion,
+					nil,
+					nil,
+					nodeClass.Spec.BlockDeviceMappings,
+					nodeClass.Spec.InstanceStorePolicy,
+					nil,
+					nodeClass.Spec.Kubelet.MaxPods,
+					nodeClass.Spec.Kubelet.PodsPerCore,
+					nodeClass.Spec.Kubelet.KubeReserved,
+					nodeClass.Spec.Kubelet.SystemReserved,
+					nodeClass.Spec.Kubelet.EvictionHard,
+					nodeClass.Spec.Kubelet.EvictionSoft,
+					nodeClass.AMIFamily(),
+					2,
+					nil,
+				)
+				Expect(it.Capacity.Name(v1.ResourceNVIDIAGPU, resource.DecimalSI).Value()).To(BeNumerically("==", 2))
+			}
+		}
+	})
 	Context("Overhead", func() {
 		var info ec2types.InstanceTypeInfo
 		BeforeEach(func() {
@@ -1120,6 +1170,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Overhead.SystemReserved.Cpu().String()).To(Equal("0"))
@@ -1149,6 +1200,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Overhead.SystemReserved.Cpu().String()).To(Equal("2"))
@@ -1174,6 +1226,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Overhead.KubeReserved.Cpu().String()).To(Equal("80m"))
@@ -1208,6 +1261,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Overhead.KubeReserved.Cpu().String()).To(Equal("2"))
@@ -1249,6 +1303,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("500Mi"))
@@ -1280,6 +1335,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().Value()).To(BeNumerically("~", float64(it.Capacity.Memory().Value())*0.1, 10))
@@ -1311,6 +1367,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("0"))
@@ -1342,6 +1399,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("100Mi"))
@@ -1375,6 +1433,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("100Mi"))
@@ -1409,6 +1468,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().Value()).To(BeNumerically("~", float64(it.Capacity.Memory().Value())*0.05, 10))
@@ -1440,6 +1500,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("100Mi"))
@@ -1475,6 +1536,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Overhead.EvictionThreshold.Memory().String()).To(Equal("1Gi"))
@@ -1497,6 +1559,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Overhead.EvictionThreshold.Cpu().String()).To(Equal("0"))
@@ -1533,6 +1596,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// Should use evictionHard (1Gi), not evictionSoft (3Gi)
@@ -1568,6 +1632,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// Should use evictionHard (5%), not evictionSoft (2%)
@@ -1603,6 +1668,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// Should use evictionHard (1Gi), not evictionSoft (10%)
@@ -1630,6 +1696,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 35))
@@ -1650,6 +1717,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 394))
@@ -1678,6 +1746,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 10))
@@ -1713,6 +1782,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// t3.large
@@ -1753,6 +1823,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 10))
@@ -1790,6 +1861,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// t3.large
@@ -1835,6 +1907,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 				nodeClass.Spec.Kubelet.EvictionHard,
 				nodeClass.Spec.Kubelet.EvictionSoft,
 				nodeClass.AMIFamily(),
+				1,
 				nil,
 			)
 			// t3.large
@@ -1868,6 +1941,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", lo.FromPtr(info.VCpuInfo.DefaultVCpus)))
@@ -1896,6 +1970,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", lo.Min([]int32{20, lo.FromPtr(info.VCpuInfo.DefaultVCpus) * 4})))
@@ -1924,6 +1999,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				limitedPods := instancetype.ENILimitedPods(ctx, info, 0, nil)
@@ -1953,6 +2029,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 35))
@@ -1973,6 +2050,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 						nodeClass.Spec.Kubelet.EvictionHard,
 						nodeClass.Spec.Kubelet.EvictionSoft,
 						nodeClass.AMIFamily(),
+						1,
 						nil,
 					)
 					Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", 394))
@@ -2113,8 +2191,8 @@ var _ = Describe("InstanceTypeProvider", func() {
 			pod.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
 				{
 					Weight: 1, Preference: corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{
-						{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
-					}},
+					{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
+				}},
 				},
 			}}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
@@ -2191,8 +2269,8 @@ var _ = Describe("InstanceTypeProvider", func() {
 			pod.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
 				{
 					Weight: 1, Preference: corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{
-						{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
-					}},
+					{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
+				}},
 				},
 			}}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
