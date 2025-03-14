@@ -78,15 +78,20 @@ func (d *DefaultResolver) CacheKey(nodeClass NodeClass) string {
 		kc = resolved
 	}
 	kcHash, _ := hashstructure.Hash(kc, hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
-	blockDeviceMappingsHash, _ := hashstructure.Hash(nodeClass.BlockDeviceMappings(), hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
-	capacityReservationHash, _ := hashstructure.Hash(nodeClass.CapacityReservations(), hashstructure.FormatV2, nil)
+	blockDeviceMappingsHash, _ := hashstructure.Hash(nodeClass.Spec.BlockDeviceMappings, hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
+	capacityReservationHash, _ := hashstructure.Hash(nodeClass.Status.CapacityReservations, hashstructure.FormatV2, nil)
+	gpuCapacityMultiplier := 1
+	if nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier] != "" {
+		gpuCapacityMultiplier, _ = strconv.Atoi(nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier])
+	}
 	return fmt.Sprintf(
-		"%016x-%016x-%016x-%s-%s",
+		"%016x-%016x-%016x-%s-%s-%02d",
 		kcHash,
 		blockDeviceMappingsHash,
 		capacityReservationHash,
 		lo.FromPtr((*string)(nodeClass.InstanceStorePolicy())),
 		nodeClass.AMIFamily(),
+		gpuCapacityMultiplier,
 	)
 }
 
@@ -98,6 +103,10 @@ func (d *DefaultResolver) Resolve(ctx context.Context, info ec2types.InstanceTyp
 	kc := &v1.KubeletConfiguration{}
 	if resolved := nodeClass.KubeletConfiguration(); resolved != nil {
 		kc = resolved
+	}
+	gpuCapacityMultiplier := 1
+	if nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier] != "" {
+		gpuCapacityMultiplier, _ = strconv.Atoi(nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier])
 	}
 	return NewInstanceType(
 		ctx,
@@ -114,7 +123,8 @@ func (d *DefaultResolver) Resolve(ctx context.Context, info ec2types.InstanceTyp
 		kc.EvictionHard,
 		kc.EvictionSoft,
 		nodeClass.AMIFamily(),
-		lo.Filter(nodeClass.CapacityReservations(), func(cr v1.CapacityReservation, _ int) bool {
+		gpuCapacityMultiplier,
+		lo.Filter(nodeClass.Status.CapacityReservations, func(cr v1.CapacityReservation, _ int) bool {
 			return cr.InstanceType == string(info.InstanceType)
 		}),
 	)
@@ -135,13 +145,14 @@ func NewInstanceType(
 	evictionHard map[string]string,
 	evictionSoft map[string]string,
 	amiFamilyType string,
+	gpuCapacityMultiplier int,
 	capacityReservations []v1.CapacityReservation,
 ) *cloudprovider.InstanceType {
 	amiFamily := amifamily.GetAMIFamily(amiFamilyType, &amifamily.Options{})
 	it := &cloudprovider.InstanceType{
 		Name:         string(info.InstanceType),
-		Requirements: computeRequirements(info, region, offeringZones, subnetZoneInfo, amiFamily, capacityReservations),
-		Capacity:     computeCapacity(ctx, info, amiFamily, blockDeviceMappings, instanceStorePolicy, maxPods, podsPerCore),
+		Requirements: computeRequirements(info, region, offeringZones, subnetZonesToZoneIDs, amiFamily, capacityReservations),
+		Capacity:     computeCapacity(ctx, info, amiFamily, blockDeviceMappings, instanceStorePolicy, maxPods, podsPerCore, gpuCapacityMultiplier),
 		Overhead: &cloudprovider.InstanceTypeOverhead{
 			KubeReserved:      kubeReservedResources(cpu(info), lo.Ternary(amiFamily.FeatureFlags().UsesENILimitedMemoryOverhead, ENILimitedPods(ctx, info, 0), pods(ctx, info, amiFamily, maxPods, podsPerCore)), kubeReserved),
 			SystemReserved:    systemReservedResources(systemReserved),
@@ -312,7 +323,7 @@ func getArchitecture(info ec2types.InstanceTypeInfo) string {
 
 func computeCapacity(ctx context.Context, info ec2types.InstanceTypeInfo, amiFamily amifamily.AMIFamily,
 	blockDeviceMapping []*v1.BlockDeviceMapping, instanceStorePolicy *v1.InstanceStorePolicy,
-	maxPods *int32, podsPerCore *int32) corev1.ResourceList {
+	maxPods *int32, podsPerCore *int32, gpuCapacityMultiplier int) corev1.ResourceList {
 
 	resourceList := corev1.ResourceList{
 		corev1.ResourceCPU:              *cpu(info),
@@ -320,8 +331,8 @@ func computeCapacity(ctx context.Context, info ec2types.InstanceTypeInfo, amiFam
 		corev1.ResourceEphemeralStorage: *ephemeralStorage(info, amiFamily, blockDeviceMapping, instanceStorePolicy),
 		corev1.ResourcePods:             *pods(ctx, info, amiFamily, maxPods, podsPerCore),
 		v1.ResourceAWSPodENI:            *awsPodENI(string(info.InstanceType)),
-		v1.ResourceNVIDIAGPU:            *nvidiaGPUs(info),
-		v1.ResourceAMDGPU:               *amdGPUs(info),
+		v1.ResourceNVIDIAGPU:            *nvidiaGPUs(info, gpuCapacityMultiplier),
+		v1.ResourceAMDGPU:               *amdGPUs(info, gpuCapacityMultiplier),
 		v1.ResourceAWSNeuron:            *awsNeuronDevices(info),
 		v1.ResourceAWSNeuronCore:        *awsNeuronCores(info),
 		v1.ResourceHabanaGaudi:          *habanaGaudis(info),
@@ -394,7 +405,7 @@ func awsPodENI(instanceTypeName string) *resource.Quantity {
 	return resources.Quantity("0")
 }
 
-func nvidiaGPUs(info ec2types.InstanceTypeInfo) *resource.Quantity {
+func nvidiaGPUs(info ec2types.InstanceTypeInfo, gpuCapacityMultiplier int) *resource.Quantity {
 	count := int32(0)
 	if info.GpuInfo != nil {
 		for _, gpu := range info.GpuInfo.Gpus {
@@ -403,10 +414,10 @@ func nvidiaGPUs(info ec2types.InstanceTypeInfo) *resource.Quantity {
 			}
 		}
 	}
-	return resources.Quantity(fmt.Sprint(count))
+	return resources.Quantity(fmt.Sprint(count * int32(gpuCapacityMultiplier)))
 }
 
-func amdGPUs(info ec2types.InstanceTypeInfo) *resource.Quantity {
+func amdGPUs(info ec2types.InstanceTypeInfo, gpuCapacityMultiplier int) *resource.Quantity {
 	count := int32(0)
 	if info.GpuInfo != nil {
 		for _, gpu := range info.GpuInfo.Gpus {
@@ -415,7 +426,7 @@ func amdGPUs(info ec2types.InstanceTypeInfo) *resource.Quantity {
 			}
 		}
 	}
-	return resources.Quantity(fmt.Sprint(count))
+	return resources.Quantity(fmt.Sprint(count * int32(gpuCapacityMultiplier)))
 }
 
 func awsNeuronCores(info ec2types.InstanceTypeInfo) *resource.Quantity {
