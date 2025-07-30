@@ -1776,38 +1776,42 @@ var _ = Describe("InstanceTypeProvider", func() {
 				})
 				Expect(ok).To(Equal(true))
 
-			instanceInfo, err := awsEnv.EC2API.DescribeInstanceTypes(ctx, &ec2.DescribeInstanceTypesInput{})
-			Expect(err).To(BeNil())
-			t3Large, ok := lo.Find(instanceInfo.InstanceTypes, func(info ec2types.InstanceTypeInfo) bool {
-				return info.InstanceType == "t3.large"
-			})
-			Expect(ok).To(Equal(true))
-			nodeClass.Spec.Kubelet = &v1.KubeletConfiguration{}
-			it := instancetype.NewInstanceType(ctx,
-				t3Large,
-				fake.DefaultRegion,
-				nil,
-				nil,
-				nodeClass.Spec.BlockDeviceMappings,
-				nodeClass.Spec.InstanceStorePolicy,
-				nodeClass.Spec.Kubelet.MaxPods,
-				nodeClass.Spec.Kubelet.PodsPerCore,
-				nodeClass.Spec.Kubelet.KubeReserved,
-				nodeClass.Spec.Kubelet.SystemReserved,
-				nodeClass.Spec.Kubelet.EvictionHard,
-				nodeClass.Spec.Kubelet.EvictionSoft,
-				nodeClass.AMIFamily(),
-				1,
-				nil,
-			)
-			// t3.large
-			// maxInterfaces = 3
-			// maxIPv4PerInterface = 12
-			// reservedENIs = 1
-			// (3 - 1) * (12 - 1) + 2 = 24
-			maxPods := 24
-			Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", maxPods))
-		})
+				nodeClass.Spec.AMIFamily = lo.ToPtr(family)
+				nodeClass.Spec.AMISelectorTerms = []v1.AMISelectorTerm{{Alias: alias}}
+				nodeClass.Spec.Kubelet = &v1.KubeletConfiguration{}
+
+				it := instancetype.NewInstanceType(ctx,
+					t3Large,
+					fake.DefaultRegion,
+					nil,
+					nil,
+					nodeClass.Spec.BlockDeviceMappings,
+					nodeClass.Spec.InstanceStorePolicy,
+					nodeClass.Spec.Kubelet.MaxPods,
+					nodeClass.Spec.Kubelet.PodsPerCore,
+					nodeClass.Spec.Kubelet.KubeReserved,
+					nodeClass.Spec.Kubelet.SystemReserved,
+					nodeClass.Spec.Kubelet.EvictionHard,
+					nodeClass.Spec.Kubelet.EvictionSoft,
+					nodeClass.AMIFamily(),
+					1,
+					nil,
+				)
+				// t3.large
+				// maxInterfaces = 3
+				// maxIPv4PerInterface = 12
+				// reservedENIs = 1
+				Expect(it.Capacity.Pods().Value()).To(BeNumerically("==", maxPods))
+				// 11 * pods + 255
+				Expect(it.Overhead.KubeReserved.Memory().String()).To(Equal(memory))
+			},
+			Entry("al2 (latest)", "al2@latest", v1.AMIFamilyAL2, 24, "640Mi"),                            // 11 * 35 + 255
+			Entry("al2023 (latest)", "al2023@latest", v1.AMIFamilyAL2023, 24, "640Mi"),                   // 11 * 35 + 255
+			Entry("bottlerocket (latest)", "bottlerocket@latest", v1.AMIFamilyBottlerocket, 24, "519Mi"), // 11 * 24 + 255
+			Entry("windows2019 (latest)", "windows2019@latest", v1.AMIFamilyWindows2019, 110, "1465Mi"),  // 11 * 110 + 255
+			Entry("windows2022 (latest)", "windows2022@latest", v1.AMIFamilyWindows2022, 110, "1465Mi"),  // 11 * 110 + 255
+			Entry("custom", fake.ImageID(), v1.AMIFamilyCustom, 24, "640Mi"),                             // 11 * 35 + 255
+		)
 		It("should reserve ENIs when aws.reservedENIs is set and not go below 0 ENIs in max-pods calculation", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
 				ReservedENIs: lo.ToPtr(1_000_000),
@@ -2113,8 +2117,8 @@ var _ = Describe("InstanceTypeProvider", func() {
 			pod.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
 				{
 					Weight: 1, Preference: corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{
-					{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
-				}},
+						{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
+					}},
 				},
 			}}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
@@ -2193,8 +2197,8 @@ var _ = Describe("InstanceTypeProvider", func() {
 			pod.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
 				{
 					Weight: 1, Preference: corev1.NodeSelectorTerm{MatchExpressions: []corev1.NodeSelectorRequirement{
-					{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
-				}},
+						{Key: corev1.LabelTopologyZone, Operator: corev1.NodeSelectorOpIn, Values: []string{"test-zone-1a"}},
+					}},
 				},
 			}}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
