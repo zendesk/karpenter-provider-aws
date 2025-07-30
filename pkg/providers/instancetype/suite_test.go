@@ -1719,6 +1719,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nodeClass.Spec.Kubelet.EvictionHard,
 					nodeClass.Spec.Kubelet.EvictionSoft,
 					nodeClass.AMIFamily(),
+					1,
 					nil,
 				)
 				// t3.large

@@ -3,7 +3,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -78,11 +78,11 @@ func (d *DefaultResolver) CacheKey(nodeClass NodeClass) string {
 		kc = resolved
 	}
 	kcHash, _ := hashstructure.Hash(kc, hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
-	blockDeviceMappingsHash, _ := hashstructure.Hash(nodeClass.Spec.BlockDeviceMappings, hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
-	capacityReservationHash, _ := hashstructure.Hash(nodeClass.Status.CapacityReservations, hashstructure.FormatV2, nil)
+	blockDeviceMappingsHash, _ := hashstructure.Hash(nodeClass.BlockDeviceMappings(), hashstructure.FormatV2, &hashstructure.HashOptions{SlicesAsSets: true})
+	capacityReservationHash, _ := hashstructure.Hash(nodeClass.CapacityReservations(), hashstructure.FormatV2, nil)
 	gpuCapacityMultiplier := 1
-	if nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier] != "" {
-		gpuCapacityMultiplier, _ = strconv.Atoi(nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier])
+	if val := nodeClass.GetAnnotations()[v1.AnnotationGPUCapacityMultiplier]; val != "" {
+		gpuCapacityMultiplier, _ = strconv.Atoi(val)
 	}
 	return fmt.Sprintf(
 		"%016x-%016x-%016x-%s-%s-%02d",
@@ -105,8 +105,8 @@ func (d *DefaultResolver) Resolve(ctx context.Context, info ec2types.InstanceTyp
 		kc = resolved
 	}
 	gpuCapacityMultiplier := 1
-	if nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier] != "" {
-		gpuCapacityMultiplier, _ = strconv.Atoi(nodeClass.Annotations[v1.AnnotationGPUCapacityMultiplier])
+	if val := nodeClass.GetAnnotations()[v1.AnnotationGPUCapacityMultiplier]; val != "" {
+		gpuCapacityMultiplier, _ = strconv.Atoi(val)
 	}
 	return NewInstanceType(
 		ctx,
@@ -124,7 +124,7 @@ func (d *DefaultResolver) Resolve(ctx context.Context, info ec2types.InstanceTyp
 		kc.EvictionSoft,
 		nodeClass.AMIFamily(),
 		gpuCapacityMultiplier,
-		lo.Filter(nodeClass.Status.CapacityReservations, func(cr v1.CapacityReservation, _ int) bool {
+		lo.Filter(nodeClass.CapacityReservations(), func(cr v1.CapacityReservation, _ int) bool {
 			return cr.InstanceType == string(info.InstanceType)
 		}),
 	)
@@ -151,7 +151,7 @@ func NewInstanceType(
 	amiFamily := amifamily.GetAMIFamily(amiFamilyType, &amifamily.Options{})
 	it := &cloudprovider.InstanceType{
 		Name:         string(info.InstanceType),
-		Requirements: computeRequirements(info, region, offeringZones, subnetZonesToZoneIDs, amiFamily, capacityReservations),
+		Requirements: computeRequirements(info, region, offeringZones, subnetZoneInfo, amiFamily, capacityReservations),
 		Capacity:     computeCapacity(ctx, info, amiFamily, blockDeviceMappings, instanceStorePolicy, maxPods, podsPerCore, gpuCapacityMultiplier),
 		Overhead: &cloudprovider.InstanceTypeOverhead{
 			KubeReserved:      kubeReservedResources(cpu(info), lo.Ternary(amiFamily.FeatureFlags().UsesENILimitedMemoryOverhead, ENILimitedPods(ctx, info, 0), pods(ctx, info, amiFamily, maxPods, podsPerCore)), kubeReserved),
