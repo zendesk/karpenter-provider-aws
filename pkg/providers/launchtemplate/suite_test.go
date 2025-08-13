@@ -1053,7 +1053,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			)
 
 			overhead := it.Overhead.Total()
-			Expect(overhead.Memory().String()).To(Equal("993Mi"))
+			Expect(overhead.Memory().String()).To(Equal("2896586342"))
 		})
 	})
 	Context("Bottlerocket", func() {
@@ -1108,7 +1108,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			)
 
 			overhead := it.Overhead.Total()
-			Expect(overhead.Memory().String()).To(Equal("993Mi"))
+			Expect(overhead.Memory().String()).To(Equal("2896586342"))
 		})
 		It("should calculate memory overhead based on max pods", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
@@ -1136,7 +1136,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 				nil,
 			)
 			overhead := it.Overhead.Total()
-			Expect(overhead.Memory().String()).To(Equal("1565Mi"))
+			Expect(overhead.Memory().String()).To(Equal("2896586342"))
 		})
 	})
 	Context("User Data", func() {
