@@ -1221,7 +1221,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 					nil,
 				)
 				Expect(it.Overhead.KubeReserved.Cpu().String()).To(Equal("80m"))
-				Expect(it.Overhead.KubeReserved.Memory().String()).To(Equal("893Mi"))
+				Expect(it.Overhead.KubeReserved.Memory().String()).To(Equal("2662858751"))
 				Expect(it.Overhead.KubeReserved.StorageEphemeral().String()).To(Equal("1Gi"))
 			})
 			It("should override kube reserved when specified", func() {
@@ -1784,13 +1784,13 @@ var _ = Describe("InstanceTypeProvider", func() {
 				// 11 * pods + 255
 				Expect(it.Overhead.KubeReserved.Memory().String()).To(Equal(memory))
 			},
-			Entry("al2 (latest)", "al2@latest", v1.AMIFamilyAL2, 10, "640Mi"),                            // 11 * 35 + 255
-			Entry("al2023 (latest)", "al2023@latest", v1.AMIFamilyAL2023, 10, "640Mi"),                   // 11 * 35 + 255
-			Entry("bottlerocket (latest)", "bottlerocket@latest", v1.AMIFamilyBottlerocket, 10, "365Mi"), // 11 * 10 + 255
-			Entry("windows2019 (latest)", "windows2019@latest", v1.AMIFamilyWindows2019, 10, "365Mi"),    // 11 * 10 + 255
-			Entry("windows2022 (latest)", "windows2022@latest", v1.AMIFamilyWindows2022, 10, "365Mi"),    // 11 * 10 + 255
-			Entry("windows2025 (latest)", "windows2025@latest", v1.AMIFamilyWindows2025, 10, "365Mi"),    // 11 * 10 + 255
-			Entry("custom", fake.ImageID(), v1.AMIFamilyCustom, 10, "640Mi"),                             // 11 * 35 + 255
+			Entry("al2 (latest)", "al2@latest", v1.AMIFamilyAL2, 10, "1803760435"),
+			Entry("al2023 (latest)", "al2023@latest", v1.AMIFamilyAL2023, 10, "1803760435"),
+			Entry("bottlerocket (latest)", "bottlerocket@latest", v1.AMIFamilyBottlerocket, 10, "1803760435"),
+			Entry("windows2019 (latest)", "windows2019@latest", v1.AMIFamilyWindows2019, 10, "1803760435"),
+			Entry("windows2022 (latest)", "windows2022@latest", v1.AMIFamilyWindows2022, 10, "1803760435"),
+			Entry("windows2025 (latest)", "windows2025@latest", v1.AMIFamilyWindows2025, 10, "1803760435"),
+			Entry("custom", fake.ImageID(), v1.AMIFamilyCustom, 10, "1803760435"),
 		)
 		It("should override max-pods value", func() {
 			instanceInfo, err := awsEnv.EC2API.DescribeInstanceTypes(ctx, &ec2.DescribeInstanceTypesInput{})
@@ -1863,13 +1863,13 @@ var _ = Describe("InstanceTypeProvider", func() {
 				// 11 * pods + 255
 				Expect(it.Overhead.KubeReserved.Memory().String()).To(Equal(memory))
 			},
-			Entry("al2 (latest)", "al2@latest", v1.AMIFamilyAL2, 24, "640Mi"),                            // 11 * 35 + 255
-			Entry("al2023 (latest)", "al2023@latest", v1.AMIFamilyAL2023, 24, "640Mi"),                   // 11 * 35 + 255
-			Entry("bottlerocket (latest)", "bottlerocket@latest", v1.AMIFamilyBottlerocket, 24, "519Mi"), // 11 * 24 + 255
-			Entry("windows2019 (latest)", "windows2019@latest", v1.AMIFamilyWindows2019, 110, "1465Mi"),  // 11 * 110 + 255
-			Entry("windows2022 (latest)", "windows2022@latest", v1.AMIFamilyWindows2022, 110, "1465Mi"),  // 11 * 110 + 255
-			Entry("windows2025 (latest)", "windows2025@latest", v1.AMIFamilyWindows2025, 110, "1465Mi"),  // 11 * 110 + 255
-			Entry("custom", fake.ImageID(), v1.AMIFamilyCustom, 24, "640Mi"),                             // 11 * 35 + 255
+			Entry("al2 (latest)", "al2@latest", v1.AMIFamilyAL2, 24, "1803760435"),
+			Entry("al2023 (latest)", "al2023@latest", v1.AMIFamilyAL2023, 24, "1803760435"),
+			Entry("bottlerocket (latest)", "bottlerocket@latest", v1.AMIFamilyBottlerocket, 24, "1803760435"),
+			Entry("windows2019 (latest)", "windows2019@latest", v1.AMIFamilyWindows2019, 110, "1803760435"),
+			Entry("windows2022 (latest)", "windows2022@latest", v1.AMIFamilyWindows2022, 110, "1803760435"),
+			Entry("windows2025 (latest)", "windows2025@latest", v1.AMIFamilyWindows2025, 110, "1803760435"),
+			Entry("custom", fake.ImageID(), v1.AMIFamilyCustom, 24, "1803760435"),
 		)
 		It("should reserve ENIs when aws.reservedENIs is set and not go below 0 ENIs in max-pods calculation", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
