@@ -194,7 +194,7 @@ func (b *CreateFleetInputBuilder) Build() *ec2.CreateFleetInput {
 		input.SpotOptions = &ec2types.SpotOptionsRequest{
 			AllocationStrategy: ec2types.SpotAllocationStrategyPriceCapacityOptimized,
 		}
-	} else if b.capacityReservationType != v1.CapacityReservationTypeCapacityBlock {
+	} else if b.capacityReservationType == karpv1.CapacityTypeOnDemand {
 		input.OnDemandOptions = &ec2types.OnDemandOptionsRequest{
 			AllocationStrategy: ec2types.FleetOnDemandAllocationStrategyPrioritized,
 		}
