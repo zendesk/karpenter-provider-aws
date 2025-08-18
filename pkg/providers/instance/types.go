@@ -196,7 +196,7 @@ func (b *CreateFleetInputBuilder) Build() *ec2.CreateFleetInput {
 		}
 	} else if b.capacityReservationType != v1.CapacityReservationTypeCapacityBlock {
 		input.OnDemandOptions = &ec2types.OnDemandOptionsRequest{
-			AllocationStrategy: ec2types.FleetOnDemandAllocationStrategyLowestPrice,
+			AllocationStrategy: ec2types.FleetOnDemandAllocationStrategyPrioritized,
 		}
 	}
 	return input
