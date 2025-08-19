@@ -154,6 +154,8 @@ func NewInstanceType(
 		},
 	}
 
+	fmt.Printf("%s: M %d KR %v SR %v ET: %v\n", it.Name, memory(ctx, info).Value(), it.Overhead.KubeReserved["memory"], it.Overhead.SystemReserved["memory"], it.Overhead.EvictionThreshold["memory"])
+
 	if it.Requirements.Compatible(scheduling.NewRequirements(scheduling.NewRequirement(corev1.LabelOSStable, corev1.NodeSelectorOpIn, string(corev1.Windows)))) == nil {
 		it.Capacity[v1.ResourcePrivateIPv4Address] = *privateIPv4Address(string(info.InstanceType))
 	}
