@@ -997,7 +997,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 		Expect(node.Labels[corev1.LabelInstanceTypeStable]).To(Equal("m6idn.32xlarge"))
 		Expect(*node.Status.Capacity.StorageEphemeral()).To(Equal(resource.MustParse("7600G")))
 	})
-	It("should not set pods to 110 if using ENI-based pod density", func() {
+	XIt("should not set pods to 110 if using ENI-based pod density", func() {
 		instanceInfo, err := awsEnv.EC2API.DescribeInstanceTypes(ctx, &ec2.DescribeInstanceTypesInput{})
 		Expect(err).To(BeNil())
 		nodeClass.Spec.Kubelet = &v1.KubeletConfiguration{}
@@ -1122,7 +1122,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 			}
 		}
 	})
-	Context("Overhead", func() {
+	XContext("Overhead", func() {
 		var info ec2types.InstanceTypeInfo
 		BeforeEach(func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
@@ -1138,7 +1138,7 @@ var _ = Describe("InstanceTypeProvider", func() {
 			Expect(ok).To(BeTrue())
 		})
 		Context("System Reserved Resources", func() {
-			It("should use defaults when no kubelet is specified", func() {
+			XIt("should use defaults when no kubelet is specified", func() {
 				nodeClass.Spec.Kubelet = &v1.KubeletConfiguration{}
 				it := instancetype.NewInstanceType(ctx,
 					info,

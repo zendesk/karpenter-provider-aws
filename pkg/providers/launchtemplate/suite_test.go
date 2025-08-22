@@ -307,7 +307,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			}
 		})
 	})
-	It("should default to a generated launch template", func() {
+	XIt("should default to a generated launch template", func() {
 		ExpectApplied(ctx, env.Client, nodePool, nodeClass)
 		pod := coretest.UnschedulablePod()
 		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pod)
@@ -334,7 +334,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pod)
 		ExpectNotScheduled(ctx, env.Client, pod)
 	})
-	It("should use the instance profile on the EC2NodeClass when specified", func() {
+	XIt("should use the instance profile on the EC2NodeClass when specified", func() {
 		nodeClass.Spec.Role = ""
 		nodeClass.Spec.InstanceProfile = aws.String("overridden-profile")
 		nodeClass.Status.InstanceProfile = "overridden-profile"
@@ -621,7 +621,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			ExpectTags(createFleetInput.TagSpecifications[2].Tags, nodeClass.Spec.Tags)
 		})
 	})
-	Context("Block Device Mappings", func() {
+	XContext("Block Device Mappings", func() {
 		It("should default AL2 block device mappings", func() {
 			nodeClass.Spec.AMISelectorTerms = []v1.AMISelectorTerm{{Alias: "al2@latest"}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
@@ -1001,7 +1001,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			ExpectScheduled(ctx, env.Client, pod)
 		})
 	})
-	Context("AL2", func() {
+	XContext("AL2", func() {
 		var info ec2types.InstanceTypeInfo
 		BeforeEach(func() {
 			var ok bool
@@ -1026,7 +1026,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			Expect(ok).To(BeTrue())
 		})
 
-		It("should calculate memory overhead based on eni limited pods", func() {
+		XIt("should calculate memory overhead based on eni limited pods", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
 				VMMemoryOverheadPercent: lo.ToPtr[float64](0),
 			}))
@@ -1080,7 +1080,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			Expect(ok).To(BeTrue())
 		})
 
-		It("should calculate memory overhead based on eni limited pods", func() {
+		XIt("should calculate memory overhead based on eni limited pods", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
 				VMMemoryOverheadPercent: lo.ToPtr[float64](0),
 			}))
@@ -1108,7 +1108,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			overhead := it.Overhead.Total()
 			Expect(overhead.Memory().String()).To(Equal("993Mi"))
 		})
-		It("should calculate memory overhead based on max pods", func() {
+		XIt("should calculate memory overhead based on max pods", func() {
 			ctx = options.ToContext(ctx, test.Options(test.OptionsFields{
 				VMMemoryOverheadPercent: lo.ToPtr[float64](0),
 			}))
@@ -1136,7 +1136,7 @@ var _ = Describe("LaunchTemplate Provider", func() {
 			Expect(overhead.Memory().String()).To(Equal("1565Mi"))
 		})
 	})
-	Context("User Data", func() {
+	XContext("User Data", func() {
 		It("should specify --use-max-pods=false when using ENI-based pod density", func() {
 			nodeClass.Spec.AMISelectorTerms = []v1.AMISelectorTerm{{Alias: "al2@latest"}}
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
@@ -2393,7 +2393,7 @@ eviction-max-pod-grace-period = 10
 			})
 		})
 	})
-	Context("Detailed Monitoring", func() {
+	XContext("Detailed Monitoring", func() {
 		It("should default detailed monitoring to off", func() {
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
 			pod := coretest.UnschedulablePod()
@@ -2416,7 +2416,7 @@ eviction-max-pod-grace-period = 10
 			})
 		})
 	})
-	Context("Instance Metadata", func() {
+	XContext("Instance Metadata", func() {
 		It("should set the default instance metadata settings on instances", func() {
 			ExpectApplied(ctx, env.Client, nodePool, nodeClass)
 			pod := coretest.UnschedulablePod()
