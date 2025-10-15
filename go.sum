@@ -189,8 +189,8 @@ github.com/prometheus/common v0.62.0 h1:xasJaQlnWAeyHdUBeGjXmutelfJHWMRr+Fg4QszZ
 github.com/prometheus/common v0.62.0/go.mod h1:vyBcEuLSvWos9B1+CyL7JZ2up+uFzXhkqml0W5zIY1I=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/rajeeshckr/karpenter v1.6.1-0.20251015025954-3745ab50a9a4 h1:3Zb5+9RbvS96781qdh0w3Rh/gr7IM/mMdQM9OgJvkPg=
-github.com/rajeeshckr/karpenter v1.6.1-0.20251015025954-3745ab50a9a4/go.mod h1:wDgGJt8Za3q4CnsYFP3LaQgJDbwZrBmzcKfFivYZZ1k=
+github.com/rajeeshckr/karpenter v1.6.1-0.20251015073828-2d06e2091f38 h1:9WArQSitZrZtS7LPOYsmXlNZHNETi4LoS2M4+P0z7RU=
+github.com/rajeeshckr/karpenter v1.6.1-0.20251015073828-2d06e2091f38/go.mod h1:wDgGJt8Za3q4CnsYFP3LaQgJDbwZrBmzcKfFivYZZ1k=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
 github.com/rivo/uniseg v0.4.4/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
