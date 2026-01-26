@@ -25,6 +25,9 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// Disable leader election for local development
+	os.Setenv("DISABLE_LEADER_ELECTION", "true")
+
 	// Load kubeconfig from default location
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{
