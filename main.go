@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/events"
 	coreoperator "sigs.k8s.io/karpenter/pkg/operator"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func main() {
@@ -47,7 +48,12 @@ func main() {
 		log.Fatalf("Failed to create kubernetes client: %v", err)
 	}
 
-	fmt.Println("Connected to 'sandbox' context")
+	// Basic connectivity check - list nodes
+	nodeList := &corev1.NodeList{}
+	if err := kubeClient.List(ctx, nodeList); err != nil {
+		log.Fatalf("Failed to list nodes: %v", err)
+	}
+	fmt.Printf("Connected to 'sandbox' context - found %d nodes\n", len(nodeList.Items))
 
 	// Create clock
 	clk := clock.RealClock{}
