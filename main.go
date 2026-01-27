@@ -51,6 +51,14 @@ func main() {
 		KubernetesInterface: kubernetes.NewForConfigOrDie(restConfig),
 	})
 
+	// Start the manager's cache before using the client
+	go func() {
+		lo.Must0(op.Manager.GetCache().Start(ctx))
+	}()
+
+	// Wait for the cache to sync
+	lo.Must0(op.Manager.GetCache().WaitForCacheSync(ctx))
+
 	// Use the operator's client to verify we can list nodes and NodeClaims
 	kubeClient := op.GetClient()
 
