@@ -24,7 +24,8 @@ import (
 )
 
 func main() {
-	validateContext()
+	clusterName := "sandbox"
+	validateContext(clusterName)
 
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
@@ -36,6 +37,7 @@ func main() {
 
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
+	os.Args = append(os.Args, fmt.Sprintf("-cluster-name=%v", clusterName))
 
 	// stolen from hack/tools/allocatable_diff/main.go
 	ctx, op := operator.NewOperator(coreoperator.NewOperator())
@@ -125,8 +127,8 @@ func main() {
 	fmt.Printf("Result: RequeueAfter=%v, Requeue=%v\n", result.RequeueAfter, result.Requeue)
 }
 
-// Verify the current kubectl context is "sandbox" since users have to use use-context because NewOperator calls ctrl.GetConfigOrDie()
-func validateContext() {
+// Verify the current kubectl context is correct since users have to use use-context because NewOperator calls ctrl.GetConfigOrDie()
+func validateContext(name string) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
@@ -135,9 +137,9 @@ func validateContext() {
 		fmt.Fprintf(os.Stderr, "Error loading kubeconfig: %v\n", err)
 		os.Exit(1)
 	}
-	if rawConfig.CurrentContext != "sandbox" {
-		fmt.Fprintf(os.Stderr, "Error: Current kubectl context is '%s', but must be 'sandbox'\n", rawConfig.CurrentContext)
-		fmt.Fprintf(os.Stderr, "Run: kubectl config use-context sandbox\n")
+	if rawConfig.CurrentContext != name {
+		fmt.Fprintf(os.Stderr, "Error: Current kubectl context is '%s', but must be '%s'\n", rawConfig.CurrentContext, name)
+		fmt.Fprintf(os.Stderr, "Run: kubectl config use-context %s\n", name)
 		os.Exit(1)
 	}
 }
