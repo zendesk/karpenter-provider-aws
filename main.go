@@ -5,19 +5,18 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/aws/karpenter-provider-aws/pkg/apis/v1" // for init
 	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
 	"github.com/aws/karpenter-provider-aws/pkg/operator"
 	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/scheme" // need this for the init()
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
@@ -31,6 +30,8 @@ import (
 func main() {
 	ctx := context.Background()
 
+	validateContext()
+
 	// Create a logger that outputs to stdout
 	logger := zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
@@ -40,16 +41,9 @@ func main() {
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
 
-	// Set the kubectl context for the operator to use
-	os.Setenv("KUBECONTEXT", "sandbox")
-
-	restConfig := config.GetConfigOrDie()
-
 	// stolen from hack/tools/allocatable_diff/main.go
-	ctx, op := operator.NewOperator(ctx, &coreoperator.Operator{
-		Manager:             lo.Must(manager.New(restConfig, manager.Options{Scheme: clientgoscheme.Scheme})),
-		KubernetesInterface: kubernetes.NewForConfigOrDie(restConfig),
-	})
+	ctx, op := operator.NewOperator(coreoperator.NewOperator())
+	fmt.Println("X")
 
 	// Start the manager's cache before using the client
 	go func() {
@@ -61,6 +55,14 @@ func main() {
 
 	// Use the operator's client to verify we can list nodes and NodeClaims
 	kubeClient := op.GetClient()
+
+	// Debug: Check if NodeClaim is registered in the scheme
+	gvks, _, err := scheme.Scheme.ObjectKinds(&karpv1.NodeClaim{})
+	if err != nil {
+		fmt.Printf("Error getting GVKs for NodeClaim: %v\n", err)
+	} else {
+		fmt.Printf("NodeClaim registered with GVKs: %v\n", gvks)
+	}
 
 	nodeList := &corev1.NodeList{}
 	lo.Must0(kubeClient.List(ctx, nodeList))
@@ -123,4 +125,21 @@ func main() {
 
 	fmt.Printf("Reconcile completed successfully\n")
 	fmt.Printf("Result: RequeueAfter=%v, Requeue=%v\n", result.RequeueAfter, result.Requeue)
+}
+
+// Verify the current kubectl context is "sandbox" since users have to use use-context because NewOperator calls ctrl.GetConfigOrDie()
+func validateContext() {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	configOverrides := &clientcmd.ConfigOverrides{}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	rawConfig, err := kubeConfig.RawConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading kubeconfig: %v\n", err)
+		os.Exit(1)
+	}
+	if rawConfig.CurrentContext != "sandbox" {
+		fmt.Fprintf(os.Stderr, "Error: Current kubectl context is '%s', but must be 'sandbox'\n", rawConfig.CurrentContext)
+		fmt.Fprintf(os.Stderr, "Run: kubectl config use-context sandbox\n")
+		os.Exit(1)
+	}
 }
