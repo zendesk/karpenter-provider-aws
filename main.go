@@ -10,11 +10,10 @@ import (
 	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -46,22 +45,22 @@ func main() {
 
 	restConfig := config.GetConfigOrDie()
 
-	// Create scheme and register Karpenter v1 types and core Kubernetes types
-	scheme := runtime.NewScheme()
-	lo.Must0(corev1.AddToScheme(scheme))
-	lo.Must0(karpv1.AddToScheme(scheme))
-
-	kubeClient := lo.Must(client.New(restConfig, client.Options{Scheme: scheme}))
-
-	// check we can list nodes
-	nodeList := &corev1.NodeList{}
-	lo.Must0(kubeClient.List(ctx, nodeList))
-
 	// stolen from hack/tools/allocatable_diff/main.go
 	ctx, op := operator.NewOperator(ctx, &coreoperator.Operator{
-		Manager:             lo.Must(manager.New(restConfig, manager.Options{})),
+		Manager:             lo.Must(manager.New(restConfig, manager.Options{Scheme: clientgoscheme.Scheme})),
 		KubernetesInterface: kubernetes.NewForConfigOrDie(restConfig),
 	})
+
+	// Use the operator's client to verify we can list nodes and NodeClaims
+	kubeClient := op.GetClient()
+
+	nodeList := &corev1.NodeList{}
+	lo.Must0(kubeClient.List(ctx, nodeList))
+	fmt.Printf("Found %d nodes\n", len(nodeList.Items))
+
+	nodeClaimList := &karpv1.NodeClaimList{}
+	lo.Must0(kubeClient.List(ctx, nodeClaimList))
+	fmt.Printf("Found %d nodeclaims\n", len(nodeClaimList.Items))
 
 	// Create clock
 	clk := clock.RealClock{}
