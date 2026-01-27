@@ -8,12 +8,9 @@ import (
 	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
 	"github.com/aws/karpenter-provider-aws/pkg/operator"
 	"github.com/samber/lo"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme" // need this for the init()
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/disruption"
@@ -52,22 +49,6 @@ func main() {
 
 	// Use the operator's client to verify we can list nodes and NodeClaims
 	kubeClient := op.GetClient()
-
-	// Debug: Check if NodeClaim is registered in the scheme
-	gvks, _, err := scheme.Scheme.ObjectKinds(&karpv1.NodeClaim{})
-	if err != nil {
-		fmt.Printf("Error getting GVKs for NodeClaim: %v\n", err)
-	} else {
-		fmt.Printf("NodeClaim registered with GVKs: %v\n", gvks)
-	}
-
-	nodeList := &corev1.NodeList{}
-	lo.Must0(kubeClient.List(ctx, nodeList))
-	fmt.Printf("Found %d nodes\n", len(nodeList.Items))
-
-	nodeClaimList := &karpv1.NodeClaimList{}
-	lo.Must0(kubeClient.List(ctx, nodeClaimList))
-	fmt.Printf("Found %d nodeclaims\n", len(nodeClaimList.Items))
 
 	// Create clock
 	clk := clock.RealClock{}
