@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -14,8 +13,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
@@ -27,23 +24,21 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
-
 	validateContext()
-
-	// Create a logger that outputs to stdout
-	logger := zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true))
-	ctx = log.IntoContext(ctx, logger)
 
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
+
+	// Configure logging to stdout
+	os.Setenv("LOG_LEVEL", "debug")
+	os.Setenv("LOG_OUTPUT_PATHS", "stdout")
+	os.Setenv("LOG_ERROR_OUTPUT_PATHS", "stderr")
 
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
 
 	// stolen from hack/tools/allocatable_diff/main.go
 	ctx, op := operator.NewOperator(coreoperator.NewOperator())
-	fmt.Println("X")
 
 	// Start the manager's cache before using the client
 	go func() {
