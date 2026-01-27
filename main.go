@@ -10,6 +10,7 @@ import (
 	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/disruption"
@@ -43,7 +45,13 @@ func main() {
 	os.Setenv("KUBECONTEXT", "sandbox")
 
 	restConfig := config.GetConfigOrDie()
-	kubeClient := lo.Must(client.New(restConfig, client.Options{}))
+
+	// Create scheme and register Karpenter v1 types and core Kubernetes types
+	scheme := runtime.NewScheme()
+	lo.Must0(corev1.AddToScheme(scheme))
+	lo.Must0(karpv1.AddToScheme(scheme))
+
+	kubeClient := lo.Must(client.New(restConfig, client.Options{Scheme: scheme}))
 
 	// check we can list nodes
 	nodeList := &corev1.NodeList{}
