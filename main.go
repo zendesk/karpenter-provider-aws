@@ -8,7 +8,6 @@ import (
 	_ "github.com/aws/karpenter-provider-aws/pkg/apis/v1" // for init
 	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
 	"github.com/aws/karpenter-provider-aws/pkg/operator"
-	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme" // need this for the init()
@@ -36,10 +35,11 @@ func main() {
 	logger := zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true))
 	ctx = log.IntoContext(ctx, logger)
 
-	ctx = options.ToContext(ctx, &options.Options{ClusterEndpoint: "foo"})
-
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
+
+	// Add cluster endpoint flag for operator.NewOperator to read
+	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
 
 	// stolen from hack/tools/allocatable_diff/main.go
 	ctx, op := operator.NewOperator(coreoperator.NewOperator())
