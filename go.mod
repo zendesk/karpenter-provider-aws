@@ -6,7 +6,7 @@ go 1.25.5
 // https://github.com/olekukonko/tablewriter/blob/c64d84b3ecc64a18cfc8ba10cdd8c52cc13a7d23/MIGRATION.md?plain=1#L661
 replace github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
 
-// run `go mod vendor` after each change!
+// run `rsync -a --delete ~/Code/tools/karpenter/ vendor/sigs.k8s.io/karpenter/` after each change!
 replace sigs.k8s.io/karpenter => /Users/mgrosser/Code/tools/karpenter
 
 require (
