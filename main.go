@@ -15,6 +15,8 @@ import (
 	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
@@ -27,6 +29,10 @@ import (
 
 func main() {
 	ctx := context.Background()
+
+	// Create a logger that outputs to stdout
+	logger := zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true))
+	ctx = log.IntoContext(ctx, logger)
 
 	ctx = options.ToContext(ctx, &options.Options{ClusterEndpoint: "foo"})
 
