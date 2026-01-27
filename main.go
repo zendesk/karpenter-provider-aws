@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
@@ -71,11 +70,14 @@ func main() {
 	// Create clock
 	clk := clock.RealClock{}
 
+	// Create noop event recorder for local development
+	noopRecorder := events.NewRecorder(&record.FakeRecorder{})
+
 	// Create AWS cloud provider
 	awsCloudProvider := cloudprovider.New(
 		op.InstanceTypesProvider,
 		op.InstanceProvider,
-		op.EventRecorder,
+		noopRecorder,
 		op.GetClient(),
 		op.AMIProvider,
 		op.SecurityGroupProvider,
