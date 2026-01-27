@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
-	"k8s.io/client-go/tools/clientcmd"
+	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
+	"github.com/aws/karpenter-provider-aws/pkg/operator"
+	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
+	"github.com/samber/lo"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
-	awsoperator "github.com/aws/karpenter-provider-aws/pkg/operator"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/disruption"
@@ -20,49 +23,34 @@ import (
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/events"
 	coreoperator "sigs.k8s.io/karpenter/pkg/operator"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func main() {
 	ctx := context.Background()
 
+	ctx = options.ToContext(ctx, &options.Options{ClusterEndpoint: "foo"})
+
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
 
-	// Load kubeconfig from default location
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	configOverrides := &clientcmd.ConfigOverrides{
-		CurrentContext: "sandbox",
-	}
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	// Set the kubectl context for the operator to use
+	os.Setenv("KUBECONTEXT", "sandbox")
 
-	// Get the rest config
-	restConfig, err := kubeConfig.ClientConfig()
-	if err != nil {
-		log.Fatalf("Failed to load kubeconfig: %v", err)
-	}
+	restConfig := config.GetConfigOrDie()
+	kubeClient := lo.Must(client.New(restConfig, client.Options{}))
 
-	// Create a controller-runtime client
-	kubeClient, err := client.New(restConfig, client.Options{})
-	if err != nil {
-		log.Fatalf("Failed to create kubernetes client: %v", err)
-	}
-
-	// Basic connectivity check - list nodes
+	// check we can list nodes
 	nodeList := &corev1.NodeList{}
-	if err := kubeClient.List(ctx, nodeList); err != nil {
-		log.Fatalf("Failed to list nodes: %v", err)
-	}
-	fmt.Printf("Connected to 'sandbox' context - found %d nodes\n", len(nodeList.Items))
+	lo.Must0(kubeClient.List(ctx, nodeList))
+
+	// stolen from hack/tools/allocatable_diff/main.go
+	ctx, op := operator.NewOperator(ctx, &coreoperator.Operator{
+		Manager:             lo.Must(manager.New(restConfig, manager.Options{})),
+		KubernetesInterface: kubernetes.NewForConfigOrDie(restConfig),
+	})
 
 	// Create clock
 	clk := clock.RealClock{}
-
-	// Initialize core operator
-	ctx, coreOp := coreoperator.NewOperator()
-
-	// Initialize AWS operator with all providers
-	ctx, op := awsoperator.NewOperator(ctx, coreOp)
 
 	// Create AWS cloud provider
 	awsCloudProvider := cloudprovider.New(
