@@ -8,9 +8,11 @@ import (
 	"github.com/aws/karpenter-provider-aws/pkg/cloudprovider"
 	"github.com/aws/karpenter-provider-aws/pkg/operator"
 	"github.com/samber/lo"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
+	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/disruption"
@@ -22,7 +24,7 @@ import (
 
 func main() {
 	clusterName := "sandbox"
-	validateContext(clusterName)
+	validateContext(clusterName + "-admin") // needs to be admin or we can't read csinode
 
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
@@ -72,6 +74,21 @@ func main() {
 
 	// Create state cluster
 	cluster := state.NewCluster(clk, kubeClient, cp)
+
+	nodeList := &corev1.NodeList{}
+	lo.Must0(kubeClient.List(ctx, nodeList))
+	for _, node := range nodeList.Items {
+		err := cluster.UpdateNode(ctx, &node)
+		if err != nil {
+			fmt.Printf("Error updating node %v: %v", node.Name, err)
+		}
+	}
+
+	nodeClaimList := &karpv1.NodeClaimList{}
+	lo.Must0(kubeClient.List(ctx, nodeClaimList))
+	for _, nc := range nodeClaimList.Items {
+		cluster.UpdateNodeClaim(&nc)
+	}
 
 	// Create event recorder (using a fake recorder for testing)
 	recorder := events.NewRecorder(&record.FakeRecorder{})
