@@ -13,16 +13,12 @@
 package strategy
 
 import (
-	"context"
 	"fmt"
 	"math"
 
-	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/samber/lo"
 	v1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 
-	sdk "github.com/aws/karpenter-provider-aws/pkg/aws"
-	"github.com/aws/karpenter-provider-aws/pkg/providers/pricing"
+	"github.com/aws/karpenter-provider-aws/pkg/simulation"
 )
 
 type Strategy interface {
@@ -30,28 +26,37 @@ type Strategy interface {
 }
 
 type LowestPrice struct {
-	pricingProvider pricing.Provider
+	// pricing is a map of instance type -> zone -> capacity type -> price
+	pricing map[string]map[string]map[string]float64
 }
 
-func NewLowestPrice(pricingAPI sdk.PricingAPI, ec2API sdk.EC2API, region string) *LowestPrice {
-	pricingProvider := pricing.NewDefaultProvider(pricingAPI, ec2API, region, false)
-	lo.Must0(pricingProvider.UpdateOnDemandPricing(context.Background()))
-	lo.Must0(pricingProvider.UpdateSpotPricing(context.Background()))
+// NewLowestPriceFromCatalog creates a LowestPrice strategy using offline pricing data from an instance type catalog.
+func NewLowestPriceFromCatalog(catalog *simulation.InstanceTypeCatalog) *LowestPrice {
 	return &LowestPrice{
-		pricingProvider: pricingProvider,
+		pricing: catalog.GetPricing(),
 	}
 }
 
 func (p *LowestPrice) GetScore(instanceType, capacityType, availabilityZone string) float64 {
+	zones, ok := p.pricing[instanceType]
+	if !ok {
+		return math.MaxFloat64
+	}
+
+	caps, ok := zones[availabilityZone]
+	if !ok {
+		return math.MaxFloat64
+	}
+
 	switch capacityType {
 	case v1.CapacityTypeSpot:
-		if score, ok := p.pricingProvider.SpotPrice(ec2types.InstanceType(instanceType), availabilityZone); ok {
-			return score
+		if price, ok := caps["spot"]; ok {
+			return price
 		}
 		return math.MaxFloat64
 	case v1.CapacityTypeOnDemand:
-		if score, ok := p.pricingProvider.OnDemandPrice(ec2types.InstanceType(instanceType)); ok {
-			return score
+		if price, ok := caps["on-demand"]; ok {
+			return price
 		}
 		return math.MaxFloat64
 	default:

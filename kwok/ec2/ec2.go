@@ -115,6 +115,30 @@ func NewClient(region, namespace string, ec2Client *ec2.Client, rateLimiterProvi
 	return c
 }
 
+// NewClientFromCatalog creates a KWOK EC2 client from pre-loaded instance types and subnets.
+// This is used for offline simulation where we don't have AWS API access.
+func NewClientFromCatalog(region, namespace string, instanceTypes []ec2types.InstanceTypeInfo, subnets []ec2types.Subnet, rateLimiterProvider RateLimiterProvider, strat strategy.Strategy, kubeClient client.Client, clk clock.Clock) *Client {
+	return &Client{
+		rateLimiterProvider: rateLimiterProvider,
+		kubeClient:          kubeClient,
+		clock:               clk,
+
+		region:        region,
+		namespace:     namespace,
+		instanceTypes: instanceTypes,
+		subnets:       subnets,
+		strategy:      strat,
+
+		instances:             sync.Map{},
+		instanceLaunchCancels: sync.Map{},
+
+		readBackupCompleted: make(chan struct{}),
+
+		launchTemplates:        sync.Map{},
+		launchTemplateNameToID: sync.Map{},
+	}
+}
+
 func (c *Client) ReadBackup(ctx context.Context) {
 	configMaps := &corev1.ConfigMapList{}
 	lo.Must0(c.kubeClient.List(ctx, configMaps, client.InNamespace(c.namespace)))

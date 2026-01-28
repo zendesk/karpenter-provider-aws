@@ -53,6 +53,7 @@ import (
 	kwokec2 "github.com/aws/karpenter-provider-aws/kwok/ec2"
 	"github.com/aws/karpenter-provider-aws/kwok/strategy"
 	sdk "github.com/aws/karpenter-provider-aws/pkg/aws"
+	"github.com/aws/karpenter-provider-aws/pkg/simulation"
 	awscache "github.com/aws/karpenter-provider-aws/pkg/cache"
 	"github.com/aws/karpenter-provider-aws/pkg/operator/options"
 	"github.com/aws/karpenter-provider-aws/pkg/providers/amifamily"
@@ -104,7 +105,17 @@ func NewOperator(ctx context.Context, operator *operator.Operator) (context.Cont
 		region := lo.Must(imds.NewFromConfig(cfg).GetRegion(ctx, nil))
 		cfg.Region = region.Region
 	}
-	ec2api := kwokec2.NewClient(cfg.Region, option.MustGetEnv("SYSTEM_NAMESPACE"), ec2.NewFromConfig(cfg), kwokec2.NewNopRateLimiterProvider(), strategy.NewLowestPrice(pricing.NewAPI(cfg), ec2.NewFromConfig(cfg), cfg.Region), operator.GetClient(), operator.Clock)
+
+	// Load instance type catalog for offline simulation (no AWS API access needed)
+	instanceTypesFile := option.MustGetEnv("KWOK_INSTANCE_TYPES_FILE")
+	instanceTypeCatalog := lo.Must(simulation.LoadInstanceTypeCatalog(instanceTypesFile))
+	pricingStrategy := strategy.NewLowestPriceFromCatalog(instanceTypeCatalog)
+
+	// Convert catalog data to EC2 types for the KWOK client
+	ec2InstanceTypes := instanceTypeCatalog.ToEC2InstanceTypeInfos()
+	fakeSubnets := instanceTypeCatalog.GenerateFakeSubnets()
+
+	ec2api := kwokec2.NewClientFromCatalog(cfg.Region, option.MustGetEnv("SYSTEM_NAMESPACE"), ec2InstanceTypes, fakeSubnets, kwokec2.NewNopRateLimiterProvider(), pricingStrategy, operator.GetClient(), operator.Clock)
 
 	eksapi := eks.NewFromConfig(cfg)
 	log.FromContext(ctx).WithValues("region", cfg.Region).V(1).Info("discovered region")
