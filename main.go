@@ -24,7 +24,7 @@ import (
 
 func main() {
 	clusterName := "sandbox"
-	validateContext(clusterName + "-admin") // needs to be admin or we can't read csinode
+	validateContext(clusterName)
 
 	// Disable leader election for local development
 	os.Setenv("DISABLE_LEADER_ELECTION", "true")
