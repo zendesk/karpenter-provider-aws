@@ -23,7 +23,12 @@ import (
 )
 
 func main() {
-	clusterName := "sandbox"
+	clusterName := os.Getenv("CLUSTER")
+	if clusterName == "" {
+		fmt.Fprintf(os.Stderr, "$CLUSTER must be set\n")
+		os.Exit(1)
+	}
+
 	validateContext(clusterName)
 
 	// Disable leader election for local development
