@@ -7,7 +7,7 @@ go 1.25.5
 replace github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
 
 // run `rsync -a --delete ~/Code/tools/karpenter/ vendor/sigs.k8s.io/karpenter/` after each change!
-replace sigs.k8s.io/karpenter => /Users/mgrosser/Code/tools/karpenter
+replace sigs.k8s.io/karpenter => ../karpenter
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
