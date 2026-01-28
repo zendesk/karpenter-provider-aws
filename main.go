@@ -93,9 +93,13 @@ func main() {
 	// Create event recorder (using a fake recorder for testing)
 	recorder := events.NewRecorder(&record.FakeRecorder{})
 
-	// Create provisioner (stub - in real usage this would need full initialization)
-	// For this test, we'll pass nil and expect it to handle gracefully or error
-	var provisioner *provisioning.Provisioner = nil
+	var provisioner = provisioning.NewProvisioner(
+		kubeClient,
+		recorder,
+		awsCloudProvider,
+		cluster,
+		clk,
+	)
 
 	// Create disruption queue
 	queue := disruption.NewQueue(kubeClient, recorder, cluster, clk, provisioner)
