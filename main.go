@@ -9,6 +9,8 @@ import (
 	"github.com/aws/karpenter-provider-aws/pkg/operator"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
@@ -21,6 +23,47 @@ import (
 	"sigs.k8s.io/karpenter/pkg/events"
 	coreoperator "sigs.k8s.io/karpenter/pkg/operator"
 )
+
+// PrintingRecorder wraps FakeRecorder and prints each event
+type PrintingRecorder struct {
+	*record.FakeRecorder
+}
+
+func (r *PrintingRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	objectName := getObjectName(object)
+	fmt.Printf("EVENT: object=%s type=%s reason=%s message=%s\n", objectName, eventtype, reason, message)
+	r.FakeRecorder.Event(object, eventtype, reason, message)
+}
+
+func (r *PrintingRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	objectName := getObjectName(object)
+	message := fmt.Sprintf(messageFmt, args...)
+	fmt.Printf("EVENT: object=%s type=%s reason=%s message=%s\n", objectName, eventtype, reason, message)
+	r.FakeRecorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
+func (r *PrintingRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	objectName := getObjectName(object)
+	message := fmt.Sprintf(messageFmt, args...)
+	fmt.Printf("EVENT: object=%s type=%s reason=%s message=%s annotations=%v\n", objectName, eventtype, reason, message, annotations)
+	r.FakeRecorder.AnnotatedEventf(object, annotations, eventtype, reason, messageFmt, args...)
+}
+
+func getObjectName(object runtime.Object) string {
+	if object == nil {
+		return "<nil>"
+	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		return fmt.Sprintf("<error: %v>", err)
+	}
+	name := accessor.GetName()
+	namespace := accessor.GetNamespace()
+	if namespace != "" {
+		return fmt.Sprintf("%s/%s", namespace, name)
+	}
+	return name
+}
 
 func main() {
 	clusterName := os.Getenv("CLUSTER")
@@ -61,7 +104,7 @@ func main() {
 	clk := clock.RealClock{}
 
 	// Create noop event recorder for local development
-	noopRecorder := events.NewRecorder(&record.FakeRecorder{})
+	noopRecorder := events.NewRecorder(&PrintingRecorder{FakeRecorder: &record.FakeRecorder{}})
 
 	// Create AWS cloud provider
 	awsCloudProvider := cloudprovider.New(
@@ -96,7 +139,7 @@ func main() {
 	}
 
 	// Create event recorder (using a fake recorder for testing)
-	recorder := events.NewRecorder(&record.FakeRecorder{})
+	recorder := events.NewRecorder(&PrintingRecorder{FakeRecorder: &record.FakeRecorder{}})
 
 	var provisioner = provisioning.NewProvisioner(
 		kubeClient,
