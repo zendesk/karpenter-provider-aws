@@ -24,6 +24,10 @@ import (
 	coreoperator "sigs.k8s.io/karpenter/pkg/operator"
 )
 
+// supported env vars via kubernetes grosser/local branch:
+// - CONSOLIDATABLE=ignore to not check the status
+// - NODEPOOLPREFIX=node-usw2a to focus on a single nodepool
+
 // PrintingRecorder wraps FakeRecorder and prints each event
 type PrintingRecorder struct {
 	*record.FakeRecorder
