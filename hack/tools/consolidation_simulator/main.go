@@ -86,6 +86,9 @@ func main() {
 	os.Setenv("LOG_OUTPUT_PATHS", "stdout")
 	os.Setenv("LOG_ERROR_OUTPUT_PATHS", "stderr")
 
+	// we ignore preferred affinity in compute-karpenter
+	os.Setenv("PREFERENCE_POLICY", "Ignore")
+
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
 	os.Args = append(os.Args, fmt.Sprintf("-cluster-name=%v", clusterName))
