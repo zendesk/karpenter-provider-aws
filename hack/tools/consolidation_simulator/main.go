@@ -89,6 +89,9 @@ func main() {
 	// we ignore preferred affinity in compute-karpenter
 	os.Setenv("PREFERENCE_POLICY", "Ignore")
 
+	// set the same features as compute-karpenter does
+	os.Setenv("FEATURE_GATES", "ReservedCapacity=false,SpotToSpotConsolidation=false,NodeRepair=false,NodeOverlay=true,StaticCapacity=false")
+
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
 	os.Args = append(os.Args, fmt.Sprintf("-cluster-name=%v", clusterName))
