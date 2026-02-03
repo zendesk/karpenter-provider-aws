@@ -90,7 +90,8 @@ func main() {
 	os.Setenv("PREFERENCE_POLICY", "Ignore")
 
 	// set the same features as compute-karpenter does
-	os.Setenv("FEATURE_GATES", "ReservedCapacity=false,SpotToSpotConsolidation=false,NodeRepair=false,NodeOverlay=true,StaticCapacity=false")
+	// TODO: set NodeOverlay=true atm that breaks the logic
+	os.Setenv("FEATURE_GATES", "ReservedCapacity=false,SpotToSpotConsolidation=false,NodeRepair=false,NodeOverlay=false,StaticCapacity=false")
 
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
@@ -147,6 +148,8 @@ func main() {
 	for _, nc := range nodeClaimList.Items {
 		cluster.UpdateNodeClaim(&nc)
 	}
+
+	// TODO: maybe also UpdateDaemonSet ... check if any exist in cache first
 
 	// Create event recorder (using a fake recorder for testing)
 	recorder := events.NewRecorder(&PrintingRecorder{FakeRecorder: &record.FakeRecorder{}})
