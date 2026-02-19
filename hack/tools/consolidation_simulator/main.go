@@ -14,10 +14,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	karpv1 "sigs.k8s.io/karpenter/pkg/apis/v1"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/metrics"
 	"sigs.k8s.io/karpenter/pkg/cloudprovider/overlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/disruption"
+	"sigs.k8s.io/karpenter/pkg/controllers/nodeoverlay"
 	"sigs.k8s.io/karpenter/pkg/controllers/provisioning"
 	"sigs.k8s.io/karpenter/pkg/controllers/state"
 	"sigs.k8s.io/karpenter/pkg/events"
@@ -95,8 +97,7 @@ func main() {
 	os.Setenv("PREFERENCE_POLICY", "Ignore")
 
 	// set the same features as compute-karpenter does
-	// TODO: set NodeOverlay=true atm that breaks the logic
-	os.Setenv("FEATURE_GATES", "ReservedCapacity=false,SpotToSpotConsolidation=false,NodeRepair=false,NodeOverlay=false,StaticCapacity=false")
+	os.Setenv("FEATURE_GATES", "ReservedCapacity=false,SpotToSpotConsolidation=false,NodeRepair=false,NodeOverlay=true,StaticCapacity=false")
 
 	// Add cluster endpoint flag for operator.NewOperator to read
 	os.Args = append(os.Args, "-cluster-endpoint=https://kubernetes.default.svc.cluster.local./")
@@ -123,7 +124,7 @@ func main() {
 	noopRecorder := events.NewRecorder(&PrintingRecorder{FakeRecorder: &record.FakeRecorder{}})
 
 	// Create AWS cloud provider
-	awsCloudProvider := cloudprovider.New(
+	rawAwsCloudProvider := cloudprovider.New(
 		op.InstanceTypesProvider,
 		op.InstanceProvider,
 		noopRecorder,
@@ -133,8 +134,8 @@ func main() {
 		op.CapacityReservationProvider,
 		op.InstanceTypeStore,
 	)
-	overlayUndecoratedCloudProvider := metrics.Decorate(awsCloudProvider)
-	cp := overlay.Decorate(overlayUndecoratedCloudProvider, op.GetClient(), op.InstanceTypeStore)
+	cp := metrics.Decorate(rawAwsCloudProvider)
+	cp = overlay.Decorate(cp, op.GetClient(), op.InstanceTypeStore)
 
 	// Create state cluster
 	cluster := state.NewCluster(clk, kubeClient, cp)
@@ -143,9 +144,7 @@ func main() {
 	lo.Must0(kubeClient.List(ctx, nodeList))
 	for _, node := range nodeList.Items {
 		err := cluster.UpdateNode(ctx, &node)
-		if err != nil {
-			fmt.Printf("Error updating node %v: %v", node.Name, err)
-		}
+		noErr(err, fmt.Sprintf("Error updating node %v"))
 	}
 
 	nodeClaimList := &karpv1.NodeClaimList{}
@@ -162,10 +161,29 @@ func main() {
 	var provisioner = provisioning.NewProvisioner(
 		kubeClient,
 		recorder,
-		awsCloudProvider,
+		cp,
 		cluster,
 		clk,
 	)
+
+	// Mark nodeoverlays as valid so reconciler does not complain
+	// TODO: this should not be needed, but somehow reconcile only works when overlays are valid, which makes no sense since it is what makes them valid
+	nodePoolList := &karpv1.NodePoolList{}
+	err := kubeClient.List(ctx, nodePoolList)
+	noErr(err, "listing nodepools")
+	op.InstanceTypeStore.EvaluatedNodePools().Insert(lo.Map(nodePoolList.Items, func(np karpv1.NodePool, _ int) string {
+		return np.Name
+	})...)
+
+	// Seed nodeoverlays (can confirm they are applied by checking IsPriceOverlaid in BuildNodePoolMap, should be true for every type)
+	overlayController := nodeoverlay.NewController(
+		kubeClient,
+		cp,
+		op.InstanceTypeStore,
+		cluster,
+	)
+	_, err = overlayController.Reconcile(ctx, reconcile.Request{})
+	noErr(err, "seeding nodeoverlays")
 
 	// Create disruption queue
 	queue := disruption.NewQueue(kubeClient, recorder, cluster, clk, provisioner)
@@ -186,13 +204,16 @@ func main() {
 	// Run Reconcile once
 	fmt.Println("Running Reconcile...")
 	result, err := controller.Reconcile(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Reconcile failed: %v\n", err)
-		os.Exit(1)
-	}
-
+	noErr(err, "reconciliation failed")
 	fmt.Printf("Reconcile completed successfully\n")
 	fmt.Printf("Result: RequeueAfter=%v, Requeue=%v\n", result.RequeueAfter, result.Requeue)
+}
+
+func noErr(err error, msg string) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", msg, err)
+		os.Exit(1)
+	}
 }
 
 // Verify the current kubectl context is correct since users have to use use-context because NewOperator calls ctrl.GetConfigOrDie()
@@ -201,10 +222,7 @@ func validateContext(name string) {
 	configOverrides := &clientcmd.ConfigOverrides{}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 	rawConfig, err := kubeConfig.RawConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading kubeconfig: %v\n", err)
-		os.Exit(1)
-	}
+	noErr(err, "Error loading kubeconfig")
 	if rawConfig.CurrentContext != name {
 		fmt.Fprintf(os.Stderr, "Error: Current kubectl context is '%s', but must be '%s'\n", rawConfig.CurrentContext, name)
 		fmt.Fprintf(os.Stderr, "Run: kubectl config use-context %s\n", name)
