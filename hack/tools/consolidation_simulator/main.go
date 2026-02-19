@@ -27,6 +27,7 @@ import (
 // supported env vars via kubernetes grosser/local branch:
 // - CONSOLIDATABLE=ignore to not check the status
 // - NODEPOOLPREFIX=node-usw2a to focus on a single nodepool
+// - CMETHOD=multi|single to run only 1 method
 
 // PrintingRecorder wraps FakeRecorder and prints each event
 type PrintingRecorder struct {
