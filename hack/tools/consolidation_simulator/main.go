@@ -72,7 +72,11 @@ func getObjectName(object runtime.Object) string {
 func main() {
 	clusterName := os.Getenv("CLUSTER")
 	if clusterName == "" {
-		fmt.Fprintf(os.Stderr, "$CLUSTER must be set\n")
+		fmt.Fprintf(os.Stderr, "CLUSTER env var must be set\n")
+		os.Exit(1)
+	}
+	if os.Getenv("AWS_REGION") == "" {
+		fmt.Fprintf(os.Stderr, "AWS_REGION env var must be set\n")
 		os.Exit(1)
 	}
 
