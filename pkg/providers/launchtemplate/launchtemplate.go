@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,7 +27,6 @@ import (
 	"github.com/awslabs/operatorpkg/serrors"
 	"go.uber.org/multierr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/karpenter/pkg/scheduling"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -128,6 +126,7 @@ func NewDefaultProvider(
 	}()
 	return l
 }
+
 func (p *DefaultProvider) EnsureAll(
 	ctx context.Context,
 	nodeClass *v1.EC2NodeClass,
@@ -142,7 +141,6 @@ func (p *DefaultProvider) EnsureAll(
 
 	opts, err := p.CreateAMIOptions(ctx, nodeClass, lo.Assign(
 		nodeClaim.Labels,
-		scheduling.NewNodeSelectorRequirementsWithMinValues(nodeClaim.Spec.Requirements...).Labels(), // Inject single-value requirements into userData
 		map[string]string{karpv1.CapacityTypeLabelKey: capacityType},
 	), tags)
 	if err != nil {
@@ -185,14 +183,6 @@ func LaunchTemplateName(options *amifamily.LaunchTemplate) string {
 }
 
 func (p *DefaultProvider) CreateAMIOptions(ctx context.Context, nodeClass *v1.EC2NodeClass, labels, tags map[string]string) (*amifamily.Options, error) {
-	// Remove any labels passed into userData that are prefixed with "node-restriction.kubernetes.io" or "kops.k8s.io" since the kubelet can't
-	// register the node with any labels from this domain: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#noderestriction
-	for k := range labels {
-		labelDomain := karpv1.GetLabelDomain(k)
-		if strings.HasSuffix(labelDomain, corev1.LabelNamespaceNodeRestriction) || strings.HasSuffix(labelDomain, "kops.k8s.io") {
-			delete(labels, k)
-		}
-	}
 	labels = InjectDoNotSyncTaintsLabel(nodeClass.AMIFamily(), labels)
 	// Relying on the status rather than an API call means that Karpenter is subject to a race
 	// condition where EC2NodeClass spec changes haven't propagated to the status once a node
@@ -272,6 +262,26 @@ func (p *DefaultProvider) createLaunchTemplate(ctx context.Context, options *ami
 
 // generateNetworkInterfaces generates network interfaces for the launch template.
 func generateNetworkInterfaces(options *amifamily.LaunchTemplate, clusterIPFamily corev1.IPFamily) []ec2types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest {
+	if len(options.NetworkInterfaces) > 0 {
+		return lo.Map(options.NetworkInterfaces, func(networkInterface *v1.NetworkInterface, _ int) ec2types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest {
+			// Assigning IPPrefixCounts or AssociatePublicIpAddress to EFA-only ENIs results in RunInstances failures w/ InvalidParameterValue
+			typeNotEFAOnly := networkInterface.InterfaceType != v1.InterfaceType(ec2types.NetworkInterfaceTypeEfaOnly)
+			return ec2types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest{
+				NetworkCardIndex: lo.ToPtr(networkInterface.NetworkCardIndex),
+				DeviceIndex:      lo.ToPtr(networkInterface.DeviceIndex),
+				InterfaceType:    lo.ToPtr(string(networkInterface.InterfaceType)),
+				Ipv4PrefixCount:  lo.Ternary(clusterIPFamily == corev1.IPv4Protocol && typeNotEFAOnly, options.IPPrefixCount, nil),
+				Ipv6PrefixCount:  lo.Ternary(clusterIPFamily == corev1.IPv6Protocol && typeNotEFAOnly, options.IPPrefixCount, nil),
+				Groups:           lo.Map(options.SecurityGroups, func(s v1.SecurityGroup, _ int) string { return s.ID }),
+				// Instances launched with multiple pre-configured network interfaces cannot set AssociatePublicIPAddress to true. This is an EC2 limitation. However, this does not apply for instances
+				// with a single ENA network interface, and we should support those use cases. Launch failures with multiple enis as ENA should be considered user misconfiguration.
+				AssociatePublicIpAddress: options.AssociatePublicIPAddress,
+				PrimaryIpv6:              lo.Ternary(clusterIPFamily == corev1.IPv6Protocol && typeNotEFAOnly, lo.ToPtr(true), nil),
+				Ipv6AddressCount:         lo.Ternary(clusterIPFamily == corev1.IPv6Protocol && typeNotEFAOnly, lo.ToPtr(int32(1)), nil),
+			}
+		})
+	}
+
 	if options.EFACount != 0 {
 		return lo.Times(options.EFACount, func(i int) ec2types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest {
 			return ec2types.LaunchTemplateInstanceNetworkInterfaceSpecificationRequest{

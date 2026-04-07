@@ -33,6 +33,7 @@ func init() {
 	karpv1.WellKnownLabels = karpv1.WellKnownLabels.Insert(
 		LabelCapacityReservationID,
 		LabelCapacityReservationType,
+		LabelCapacityReservationInterruptible,
 		LabelInstanceHypervisor,
 		LabelInstanceEncryptionInTransitSupported,
 		LabelInstanceCategory,
@@ -118,12 +119,15 @@ var (
 	AMIFamilyUbuntu                                = "Ubuntu"
 	AMIFamilyWindows2019                           = "Windows2019"
 	AMIFamilyWindows2022                           = "Windows2022"
+	AMIFamilyWindows2025                           = "Windows2025"
 	AMIFamilyCustom                                = "Custom"
 	Windows2019                                    = "2019"
 	Windows2022                                    = "2022"
+	Windows2025                                    = "2025"
 	WindowsCore                                    = "Core"
 	Windows2019Build                               = "10.0.17763"
 	Windows2022Build                               = "10.0.20348"
+	Windows2025Build                               = "10.0.26100"
 	ResourceNVIDIAGPU          corev1.ResourceName = "nvidia.com/gpu"
 	ResourceAMDGPU             corev1.ResourceName = "amd.com/gpu"
 	ResourceAWSNeuron          corev1.ResourceName = "aws.amazon.com/neuron"
@@ -135,6 +139,7 @@ var (
 
 	LabelCapacityReservationID                = apis.Group + "/capacity-reservation-id"
 	LabelCapacityReservationType              = apis.Group + "/capacity-reservation-type"
+	LabelCapacityReservationInterruptible     = apis.Group + "/capacity-reservation-interruptible"
 	LabelInstanceHypervisor                   = apis.Group + "/instance-hypervisor"
 	LabelInstanceEncryptionInTransitSupported = apis.Group + "/instance-encryption-in-transit-supported"
 	LabelInstanceCategory                     = apis.Group + "/instance-category"
@@ -166,6 +171,7 @@ var (
 	AnnotationEC2NodeClassHashVersion        = apis.Group + "/ec2nodeclass-hash-version"
 	AnnotationInstanceTagged                 = apis.Group + "/tagged"
 	AnnotationInstanceProfile                = apis.Group + "/instance-profile-name"
+	AnnotationGPUCapacityMultiplier          = apis.Group + "/gpu-capacity-multiplier"
 
 	NodeClaimTagKey          = coreapis.Group + "/nodeclaim"
 	NameTagKey               = "Name"
