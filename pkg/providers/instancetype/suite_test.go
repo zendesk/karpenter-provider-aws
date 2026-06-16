@@ -766,7 +766,8 @@ var _ = Describe("InstanceTypeProvider", func() {
 		ExpectProvisioned(ctx, env.Client, cluster, cloudProvider, prov, pods...)
 		for _, pod := range pods {
 			node := ExpectScheduled(ctx, env.Client, pod)
-			Expect(node.Labels).To(HaveKeyWithValue(corev1.LabelInstanceTypeStable, "p3.8xlarge"))
+			// A pod requesting 8 GPUs with a 2x multiplier should fit on a 4-physical-GPU instance
+			Expect(node.Labels).To(HaveKeyWithValue("karpenter.k8s.aws/instance-gpu-count", "4"))
 			nodeNames.Insert(node.Name)
 		}
 		Expect(nodeNames.Len()).To(Equal(1))
