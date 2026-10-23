@@ -361,6 +361,11 @@ func (v *Validation) validateCreateLaunchTemplateAuthorization(
 	if err != nil {
 		return nil, reconcile.Result{}, fmt.Errorf("generating options, %w", err)
 	}
+	if len(instanceTypes) == 0 {
+		// instance types resolve from nodeClass status subnets/AMIs, which are empty on a fresh nodeclass
+		// until the resolution reconcilers run; requeue instead of panicking on instanceTypes[:1]
+		return nil, reconcile.Result{Requeue: true}, nil
+	}
 	// pass 1 instance type in EnsureAll to only create 1 launch template
 	tenancyType := getTenancyType(nodePools)
 
