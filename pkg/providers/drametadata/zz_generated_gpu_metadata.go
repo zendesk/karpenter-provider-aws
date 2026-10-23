@@ -1476,6 +1476,27 @@ var GPUMetadataByInstanceType = map[string]*DeviceMetadata{
 			},
 		},
 	},
+	// zen: added manually, g7 is not in the upstream scrape yet. Memory matches the value the
+	// driver advertised on pod998; pcieRoot is a placeholder copied from the g6e family pattern.
+	"g7.2xlarge": {
+		Count: 1,
+		Devices: []DRADevice{
+			{
+				Attributes: map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{
+					"architecture":                    {StringValue: strPtr("Blackwell")},
+					"brand":                           {StringValue: strPtr("Nvidia")},
+					"cudaComputeCapability":           {VersionValue: strPtr("12.0.0")},
+					"productName":                     {StringValue: strPtr("NVIDIA RTX PRO 4500")},
+					"resource.kubernetes.io/pcieRoot": {StringValue: strPtr("pci0000:2f")},
+					"type":                            {StringValue: strPtr("gpu")},
+				},
+				Capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
+					"memory": {Value: resource.MustParse("32623Mi")},
+				},
+			},
+		},
+	},
+
 	"p3dn.24xlarge": {
 		Count: 8,
 		Devices: []DRADevice{
