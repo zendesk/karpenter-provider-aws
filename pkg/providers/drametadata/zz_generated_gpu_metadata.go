@@ -1487,7 +1487,7 @@ var GPUMetadataByInstanceType = map[string]*DeviceMetadata{
 					"brand":                           {StringValue: strPtr("Nvidia")},
 					"cudaComputeCapability":           {VersionValue: strPtr("12.0.0")},
 					"productName":                     {StringValue: strPtr("NVIDIA RTX PRO 4500")},
-					"resource.kubernetes.io/pcieRoot": {StringValue: strPtr("pci0000:2f")},
+					"resource.kubernetes.io/pcieRoot": {StringValue: strPtr("pci0000:2e")},
 					"type":                            {StringValue: strPtr("gpu")},
 				},
 				Capacity: map[resourcev1.QualifiedName]resourcev1.DeviceCapacity{
