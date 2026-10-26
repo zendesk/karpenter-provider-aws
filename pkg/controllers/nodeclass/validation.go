@@ -361,6 +361,13 @@ func (v *Validation) validateCreateLaunchTemplateAuthorization(
 	if err != nil {
 		return nil, reconcile.Result{}, fmt.Errorf("generating options, %w", err)
 	}
+	// Guard against an empty instance type list. This can happen when no instance type is compatible with the
+	// NodeClass and its linked NodePools (e.g. no offering intersects the NodePool's zone/capacity-type
+	// requirements). Slicing an empty list with [:1] panics, which kills the reconcile before the NodeClass
+	// status is ever persisted, leaving the NodeClass stuck without conditions forever.
+	if len(instanceTypes) == 0 {
+		return nil, reconcile.Result{}, fmt.Errorf("no compatible instance types found for nodeclass and its nodepools")
+	}
 	// pass 1 instance type in EnsureAll to only create 1 launch template
 	tenancyType := getTenancyType(nodePools)
 
