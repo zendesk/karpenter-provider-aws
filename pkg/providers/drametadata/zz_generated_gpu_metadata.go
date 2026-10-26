@@ -1476,8 +1476,8 @@ var GPUMetadataByInstanceType = map[string]*DeviceMetadata{
 			},
 		},
 	},
-	// zen: added manually, g7 is not in the upstream scrape yet. Memory matches the value the
-	// driver advertised on pod998; pcieRoot is a placeholder copied from the g6e family pattern.
+	// zen: added manually, g7 is not in the upstream scrape yet. Values verified against the
+	// driver's published ResourceSlice on a live pod998 node (2026-10-23).
 	"g7.2xlarge": {
 		Count: 1,
 		Devices: []DRADevice{
